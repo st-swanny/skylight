@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Airport, Config, ShowFields, LocationProfile } from "@shared/index.js";
-import { convertAltitude, convertAltitudeToFt, convertDistance, convertDistanceToMi, round } from "@shared/index.js";
+import {
+  addAirport,
+  convertAltitude,
+  convertAltitudeToFt,
+  convertDistance,
+  convertDistanceToMi,
+  listAirports,
+  makeHomeAirport,
+  removeAirport,
+  round,
+} from "@shared/index.js";
 import { formatLatLon } from "@shared/format.js";
 import { CONSTELLATIONS } from "@shared/stars.js";
 import { geoAvailability, geoErrorMessage } from "../lib/geolocation.js";
@@ -124,7 +134,9 @@ export function Control() {
       locationName: p.name,
       // Restore the runway overlay saved with the profile (#62). Older
       // profiles without one keep whatever airport is currently loaded.
-      ...(p.airport ? { airport: p.airport, showAirport: p.showAirport ?? true } : {}),
+      ...(p.airport
+        ? { airport: p.airport, extraAirports: p.extraAirports ?? [], showAirport: p.showAirport ?? true }
+        : {}),
     });
   const saveCurrentProfile = () => {
     const name = cfg.locationName?.trim() || formatLatLon(cfg.centerLat, cfg.centerLon);
@@ -135,6 +147,7 @@ export function Control() {
       lon: cfg.centerLon,
       radiusMiles: cfg.radiusMiles,
       airport: cfg.airport,
+      extraAirports: cfg.extraAirports,
       showAirport: cfg.showAirport,
     };
     // Replace any existing profile already saved at this spot.
@@ -151,7 +164,7 @@ export function Control() {
     set({ centerLat: lat, centerLon: lon, locationName: "Traffic center" });
   };
 
-  // Import runway geometry for any airport and draw it on the ceiling.
+  // Import runway geometry for any airport and add it to the ceiling.
   const importAirport = async (code: string) => {
     if (!code.trim()) return;
     setApBusy(true);
@@ -163,13 +176,14 @@ export function Control() {
         setApErr(body.error ?? "Lookup failed");
         return;
       }
-      set({ airport: body, showAirport: true });
+      set({ ...addAirport(cfg, body), showAirport: true });
     } catch {
       setApErr("Lookup failed");
     } finally {
       setApBusy(false);
     }
   };
+  const airports = listAirports(cfg);
   const centerOnAirport = () =>
     set({
       centerLat: cfg.airport.lat,
@@ -302,20 +316,20 @@ export function Control() {
           </div>
           <Row
             label="Runways"
-            hint={`${cfg.airport.icao}${cfg.airport.fullName ? ` · ${cfg.airport.fullName}` : ""}`}
+            hint={`Home: ${cfg.airport.icao}${cfg.airport.fullName ? ` · ${cfg.airport.fullName}` : ""}`}
           >
             <div className="loc-bar">
               <TextInput
-                key={cfg.airport.icao}
+                key={airports.map((a) => a.icao).join(",")}
                 value=""
-                placeholder="airport code (KSFO, EDDF, SNA…)"
-                ariaLabel="Import airport runways"
+                placeholder="add airport (KSFO, EDDF, SNA…)"
+                ariaLabel="Add airport runways"
                 onCommit={importAirport}
               />
               <button
                 type="button"
                 className="loc-btn"
-                aria-label="Center view on the airport"
+                aria-label="Center view on the home airport"
                 disabled={apBusy}
                 onClick={centerOnAirport}
               >
@@ -323,6 +337,37 @@ export function Control() {
               </button>
             </div>
           </Row>
+          {airports.length > 1 && (
+            <>
+              <div className="chips">
+                {airports.map((ap) => {
+                  const home = ap.icao === cfg.airport.icao;
+                  return (
+                    <span key={ap.icao} className={`profile-chip ${home ? "on" : ""}`}>
+                      <button
+                        className="profile-name"
+                        title={ap.fullName ?? ap.icao}
+                        aria-label={home ? `${ap.name} (home airport)` : `Make ${ap.name} the home airport`}
+                        onClick={() => !home && set(makeHomeAirport(cfg, ap.icao))}
+                      >
+                        {home ? `★ ${ap.name}` : ap.name}
+                      </button>
+                      <button
+                        className="profile-del"
+                        aria-label={`Remove ${ap.name}`}
+                        onClick={() => set(removeAirport(cfg, ap.icao))}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+              <Row label="" hint="★ home airport (route checks, departure priority) · tap another to make it home">
+                <span />
+              </Row>
+            </>
+          )}
           {apBusy && <Row label="" hint="importing runways…"><span /></Row>}
           {apErr && <Row label="" hint={apErr}><span /></Row>}
         </Section>
@@ -559,7 +604,7 @@ export function Control() {
           <Row label="Compass">
             <Toggle value={cfg.compass} onChange={(v) => set({ compass: v })} />
           </Row>
-          <Row label="Airport runways" hint="SFO geometry; off if you've moved">
+          <Row label="Airport runways" hint="airports from Location → Runways">
             <Toggle value={cfg.showAirport} onChange={(v) => set({ showAirport: v })} />
           </Row>
           <Row label="Highlight emergency">

@@ -39,6 +39,7 @@ import {
   greatCircleMiles,
   routePlausible,
   FT_TO_M,
+  listAirports,
   KM_TO_M,
   MI_TO_M,
   type Aircraft,
@@ -700,18 +701,32 @@ export class Renderer {
     }
   }
 
-  // --- airport: runways at true geographic position ---
+  // --- airports: runways at true geographic position ---
   private drawAirport(cfg: Config, proj: ProjOpts): void {
     const ctx = this.ctx;
     const rwyRgb: [number, number, number] = [150, 180, 220];
-    {
-      const ap = cfg.airport;
+    const margin = 40;
+    const onScreen = (p: Point) => p.x >= -margin && p.x <= this.w + margin && p.y >= -margin && p.y <= this.h + margin;
+    // Labels already drawn this frame; a later airport's label that would
+    // land on top of one is skipped (home is drawn first, so it always wins).
+    const labels: Point[] = [];
+    for (const ap of listAirports(cfg)) {
+      const segs = ap.runways.map((r) => ({
+        r,
+        a: this.toScreen(r.le, cfg, proj),
+        b: this.toScreen(r.he, cfg, proj),
+      }));
+      // Skip airports entirely off the ceiling (bbox test, so a runway that
+      // merely crosses the screen still draws).
+      if (!segs.length) continue;
+      const xs = segs.flatMap((s) => [s.a.x, s.b.x]);
+      const ys = segs.flatMap((s) => [s.a.y, s.b.y]);
+      if (Math.max(...xs) < -margin || Math.min(...xs) > this.w + margin) continue;
+      if (Math.max(...ys) < -margin || Math.min(...ys) > this.h + margin) continue;
+
       let cx = 0;
       let cy = 0;
-      let n = 0;
-      for (const r of ap.runways) {
-        const a = this.toScreen(r.le, cfg, proj);
-        const b = this.toScreen(r.he, cfg, proj);
+      for (const { r, a, b } of segs) {
         // True runway width in px, nudged up a touch so it stays legible.
         const wpx = Math.max(2.5, r.widthFt * FT_TO_M * proj.pxPerM * 1.4);
 
@@ -736,30 +751,30 @@ export class Renderer {
 
         cx += (a.x + b.x) / 2;
         cy += (a.y + b.y) / 2;
-        n++;
       }
       // Airport label at the runway centroid.
-      if (n) {
-        cx /= n;
-        cy /= n;
-        ctx.save();
-        ctx.font = `300 13px ${cfg.fonts.label}`;
-        ctx.fillStyle = rgba(rwyRgb, 0.5 * cfg.brightness);
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        try {
-          ctx.letterSpacing = "4px";
-        } catch {
-          /* noop */
-        }
-        ctx.fillText(ap.name, cx, cy);
-        try {
-          ctx.letterSpacing = "0px";
-        } catch {
-          /* noop */
-        }
-        ctx.restore();
+      cx /= segs.length;
+      cy /= segs.length;
+      const c = { x: cx, y: cy };
+      if (!onScreen(c) || labels.some((l) => Math.hypot(l.x - cx, l.y - cy) < 48)) continue;
+      labels.push(c);
+      ctx.save();
+      ctx.font = `300 13px ${cfg.fonts.label}`;
+      ctx.fillStyle = rgba(rwyRgb, 0.5 * cfg.brightness);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      try {
+        ctx.letterSpacing = "4px";
+      } catch {
+        /* noop */
       }
+      ctx.fillText(ap.name, cx, cy);
+      try {
+        ctx.letterSpacing = "0px";
+      } catch {
+        /* noop */
+      }
+      ctx.restore();
     }
   }
 

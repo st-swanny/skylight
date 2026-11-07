@@ -247,7 +247,10 @@ Raspberry Pi OS; Node.js no longer ships 32-bit ARM builds. Re-flash with
 **Runways for my airport.** `/control` → Location → **Runways**: enter the ICAO or
 IATA code (e.g. `EGLL`, `EDDF`, `SNA`). Geometry comes from the public-domain
 OurAirports dataset; very small airfields sometimes lack surveyed runway endpoints,
-in which case you'll get a clear error.
+in which case you'll get a clear error. Each code you enter is added, so you can
+show several airports at once (SFO, OAK and SJC, say). One is the **home** airport
+(★) - the one route checks and the tracker's departure priority use. Tap another
+airport's chip to make it home, or × to remove it.
 
 **Clock on the TV dashboard is wrong.** It shows the Pi's system time - fix the
 timezone with `sudo timedatectl set-timezone <Region/City>`.
@@ -263,6 +266,7 @@ fields:
 | `centerLat` / `centerLon` | **Your location** - where you're looking up. Editable from the panel's **Location** section (type a city, airport code, or `lat,lon`). |
 | `locationName` | Display name for the current location, shown in the control panel. |
 | `locationProfiles` | Saved places (favorite airports). Switch between them from the panel's **Location** section - tap **Save current** to store the active spot, then a chip to jump back to it. |
+| `airport` / `extraAirports` | Runways drawn on the ceiling: the home airport, plus any extras that are only drawn. Managed from **Location → Runways**. |
 | `radiusMiles` | How far out to show (default 3 - "what you could realistically see"). |
 | `radioUrl` / `apiUrl` | Where aircraft come from - your decoder's `aircraft.json`, and the aggregator used by the `api` source. Both live-editable from the panel's **Source** section (see [Aggregators](#aggregators)). |
 | `rotationDeg` / `mirrorX` | Calibration for the looking-up flip (tune against a real pass). |
@@ -274,10 +278,9 @@ fields:
 
 **Using it somewhere other than SFO:** set your location from the control panel's
 **Location** section (or edit `centerLat`/`centerLon`). Stars, sun, moon, and satellites
-are computed for your coordinates automatically. The runway overlay is still SFO-specific
-geometry - turn off **Airport runways** if you've moved, or replace it in
-[`web/src/display/airports.ts`](web/src/display/airports.ts) with your local airport
-(coordinates from [OurAirports](https://ourairports.com/data/)).
+are computed for your coordinates automatically. Import your local
+airports under **Location → Runways** (see above) and remove SFO, or turn off
+**Airport runways**.
 
 > Location search uses the free [Nominatim](https://nominatim.openstreetmap.org/)
 > (OpenStreetMap) service. Set `GEOCODE_USER_AGENT` to identify your deployment if you

@@ -57,6 +57,8 @@ export interface LocationProfile {
   /** Runway overlay captured when the profile was saved, so switching
    *  profiles restores that airport's runways without re-importing (#62). */
   airport?: Airport;
+  /** Extra airports drawn alongside it when the profile was saved. */
+  extraAirports?: Airport[];
   /** Whether the runway overlay was visible when the profile was saved. */
   showAirport?: boolean;
 }
@@ -445,11 +447,14 @@ export interface Config {
   rangeRings: boolean;
   compass: boolean;
   highlightEmergency: boolean;
-  /** Draw the airport (runways) at its true geographic position. */
+  /** Draw the airports (runways) at their true geographic positions. */
   showAirport: boolean;
-  /** Which airport to draw — importable by ICAO/IATA code from the control
-   *  panel (worldwide, via OurAirports). */
+  /** The home airport — drawn on the ceiling, and the one the route checks,
+   *  tracker departure priority and camera home pose use. Importable by
+   *  ICAO/IATA code from the control panel (worldwide, via OurAirports). */
   airport: Airport;
+  /** More airports drawn alongside the home airport (display only). */
+  extraAirports: Airport[];
   /** Show the on-screen calibration HUD on the display. */
   showHud: boolean;
 
@@ -559,6 +564,7 @@ export const DEFAULT_CONFIG: Config = {
   highlightEmergency: true,
   showAirport: true,
   airport: SFO_AIRPORT,
+  extraAirports: [],
   showHud: false,
 
   planetariumMode: false,
@@ -711,6 +717,8 @@ export function mergeConfig(base: Config, patch: Partial<Config>): Config {
   return {
     ...base,
     ...patch,
+    // Lists replace wholesale; a malformed persisted value falls back.
+    extraAirports: Array.isArray(patch.extraAirports) ? patch.extraAirports : base.extraAirports ?? [],
     palette: { ...base.palette, ...(patch.palette ?? {}) },
     fonts: { ...base.fonts, ...(patch.fonts ?? {}) },
     showFields: { ...base.showFields, ...(patch.showFields ?? {}) },
